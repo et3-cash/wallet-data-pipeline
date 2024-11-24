@@ -1,10 +1,9 @@
-version: '3.9'
 services:
   oltp-db:
     image: postgres:14
     container_name: oltp-db
     ports:
-      - '5434:5432'
+      - '5440:5432'
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
@@ -16,7 +15,7 @@ services:
     image: postgres:14
     container_name: dw-db
     ports:
-      - '5435:5432'
+      - '5441:5432'
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
@@ -31,10 +30,27 @@ services:
       - '8088:8080'
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      AIRFLOW__CORE__EXECUTOR: 'LocalExecutor' # Ensure the LocalExecutor is used
+      AIRFLOW_HOME: /opt/airflow
     volumes:
       - ./etl:/opt/airflow/dags
-    command: ['webserver']
+      - ./airflow/logs:/opt/airflow/logs # Optional: To persist logs
+      - ./db:/opt/airflow/dags/data # Mount the db folder so Airflow can access it
+    command: >
+      bash -c "airflow db init && airflow scheduler & airflow webserver"
+    depends_on:
+      - oltp-db
+      - dw-db
+    # Add a health check to wait for the database to be ready
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-h', 'oltp-db', '-p', '5432', '-U', 'admin']
+      retries: 2
+      interval: 5s
+      start_period: 20s
+      timeout: 5s
+    restart: always
 
 volumes:
   pg_data:
   dw_data:
+  airflow_logs: # Add this to persist logs across container restarts
