@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:14
+    container_name: postgres_oltp
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: wallet_oltp
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d
+
+  postgres_dw:
+    image: postgres:14
+    container_name: postgres_dw
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: wallet_dw
+    ports:
+      - '5433:5432'
+    volumes:
+      - ./datawarehouse:/docker-entrypoint-initdb.d
+
+  airflow-webserver:
+    image: apache/airflow:2.7.1
+    container_name: airflow-webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__FERNET_KEY: wallet_etl
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./etl:/opt/airflow/dags
+    depends_on:
+      - postgres
+      - postgres_dw
