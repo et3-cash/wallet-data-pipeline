@@ -97,15 +97,14 @@ COMMIT;
 
 -- Create DimTransactionTypes Table (Dimension)
 CREATE TABLE dim_transaction_types (
-    transaction_type_id SERIAL PRIMARY KEY,
-    transaction_type VARCHAR(20) UNIQUE
+    transaction_type VARCHAR(255) PRIMARY KEY
 );
 
 
 -- Create FactTransactions Table (Fact)
 CREATE TABLE fact_transactions (
     transaction_id BIGINT PRIMARY KEY,
-    transaction_type_id INT REFERENCES dim_transaction_types(transaction_type_id),
+    transaction_type VARCHAR(255) REFERENCES dim_transaction_types(transaction_type),
     user_id BIGINT REFERENCES dim_users(user_id),
     date_id INT REFERENCES dim_dates(date_dim_id),
     amount NUMERIC(10, 2),

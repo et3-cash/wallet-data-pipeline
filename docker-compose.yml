@@ -10,6 +10,8 @@ services:
       POSTGRES_DB: oltp_db
     volumes:
       - ./db:/docker-entrypoint-initdb.d
+    networks:
+      - airflow_network
 
   dw-db:
     image: postgres:14
@@ -22,6 +24,8 @@ services:
       POSTGRES_DB: dw_db
     volumes:
       - ./datawarehouse:/docker-entrypoint-initdb.d
+    networks:
+      - airflow_network
 
   airflow:
     image: apache/airflow:2.7.0
@@ -32,15 +36,24 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
       AIRFLOW__CORE__EXECUTOR: 'LocalExecutor' # Ensure the LocalExecutor is used
       AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'True'
     volumes:
-      - ./etl:/opt/airflow/dags
+      - ./etl/dags:/opt/airflow/dags
+      - ./etl/scripts:/opt/airflow/scripts
+      - ./etl/edges:/opt/airflow/edges
       - ./airflow/logs:/opt/airflow/logs # Optional: To persist logs
-      - ./db:/opt/airflow/dags/data # Mount the db folder so Airflow can access it
+      - ./db/data:/opt/airflow/dags/data # Mount the db folder so Airflow can access it
+    networks:
+      - airflow_network
     command: >
-      bash -c "airflow db init && airflow scheduler & airflow webserver"
+      bash -c "airflow db init && 
+               python /opt/airflow/scripts/setup_connections.py && 
+               airflow scheduler & airflow webserver"
     depends_on:
       - oltp-db
       - dw-db
+      - airflow-db
     # Add a health check to wait for the database to be ready
     healthcheck:
       test: ['CMD', 'pg_isready', '-h', 'oltp-db', '-p', '5432', '-U', 'admin']
@@ -50,7 +63,25 @@ services:
       timeout: 5s
     restart: always
 
+  airflow-db:
+    image: postgres:14
+    container_name: airflow-db
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - '5442:5432'
+    volumes:
+      - ./db_data:/var/lib/postgresql/data
+    networks:
+      - airflow_network
+
 volumes:
   pg_data:
   dw_data:
   airflow_logs: # Add this to persist logs across container restarts
+
+networks:
+  airflow_network:
+    driver: bridge

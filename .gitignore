@@ -1,2 +1,7 @@
 /data_generation/*.csv
 /data_generation/*.json
+
+__pycache__/
+logs/
+
+db_data/
